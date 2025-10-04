@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Settings, X, Check, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Settings, X, Check, Wrench, ChevronDown, ChevronUp } from 'lucide-react'; // Settings 用于注释掉的 Tools 按钮
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Message, Tool, ContentBlock } from '../types';
@@ -163,7 +163,8 @@ const ChatPage: React.FC<ChatPageProps> = ({
               <h1 className="text-2xl font-bold text-gray-900 mb-2">Chat with Rambot</h1>
               <p className="text-gray-600">Have any questions? Ask me anything!</p>
             </div>
-            <button
+            {/* Tools 按钮 - 暂时隐藏，以后可能需要 */}
+            {/* <button
               onClick={() => setShowToolsModal(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200/50 rounded-xl transition-all duration-300 hover:shadow-md group"
             >
@@ -171,7 +172,7 @@ const ChatPage: React.FC<ChatPageProps> = ({
               <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors duration-300">
                 Tools ({enabledToolsCount})
               </span>
-            </button>
+            </button> */}
           </div>
 
           {/* Messages Area */}

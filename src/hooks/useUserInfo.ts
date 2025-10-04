@@ -23,7 +23,7 @@ export const useAuthorInfo = () => {
         setError(null);
         
         // API端点地址
-        const response = await fetch('http://localhost:8000/api/v1/author/author-info');
+        const response = await fetch('https://ai-mindflicker.com/api/v1/author/author-info');
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

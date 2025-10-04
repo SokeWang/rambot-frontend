@@ -2,7 +2,7 @@
 
 ## API 端点
 ```
-GET http://localhost:8000/api/user-info
+GET https://ai-mindflicker.com/api/user-info
 ```
 
 ## 请求头

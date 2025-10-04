@@ -2,7 +2,7 @@
 
 ## API 端点
 ```
-GET https://ai-mindflicker.com/api/user-info
+GET https://rambot.ai-mindflicker.com/api/user-info
 ```
 
 ## 请求头

@@ -4,7 +4,7 @@
 
 import { ChatHistoryItem, ChatHistoryResponse, ToolCall, ToolCallEventData } from '../types';
 
-const API_BASE_URL = 'https://ai-mindflicker.com/api/v1';
+const API_BASE_URL = 'https://rambot.ai-mindflicker.com/api/v1';
 
 export class ApiError extends Error {
   constructor(

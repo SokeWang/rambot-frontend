@@ -1,9 +1,27 @@
+// 工具调用信息类型
+export interface ToolCall {
+  tool_call_id: string;
+  tool_name: string;
+  tool_args: Record<string, any>;
+  result?: string;
+  duration?: number;
+}
+
+// 内容块类型 - 可以是文本或工具调用
+export interface ContentBlock {
+  type: 'text' | 'tool_call_started' | 'tool_call_completed';
+  text?: string;  // 当 type 为 'text' 时使用
+  toolCall?: ToolCall;  // 当 type 为 'tool_call_*' 时使用
+  order: number;  // 用于排序
+}
+
 // 基础消息类型
 export interface Message {
   id: number;
-  text: string;
+  text: string;  // 保留用于向后兼容，但主要使用 blocks
   sender: 'user' | 'assistant';
   timestamp: Date;
+  blocks?: ContentBlock[];  // 按顺序的内容块
 }
 
 // 工具类型
@@ -19,7 +37,7 @@ export type Page = 'home' | 'chat' | 'about';
 
 // 聊天历史相关类型
 export interface ChatHistoryItem {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool';
   content: string;
   created_at: number;
 }
@@ -40,11 +58,24 @@ export interface ApiError {
 }
 
 // 流式响应事件类型
-export type StreamEventType = 'RunContent' | 'RunCompleted' | 'RunError';
+export type StreamEventType = 'RunContent' | 'RunCompleted' | 'RunError' | 'ToolCallStarted' | 'ToolCallCompleted';
 
 export interface StreamEvent {
   type: StreamEventType;
   data: any;
+}
+
+// 工具调用事件数据类型
+export interface ToolCallEventData {
+  tool_call_id: string;
+  tool_name: string;
+  tool_args: Record<string, any>;
+  tool_call_error?: boolean;
+  result?: string;
+  metrics?: {
+    duration: number;
+  };
+  content?: string;
 }
 
 // 用户会话类型

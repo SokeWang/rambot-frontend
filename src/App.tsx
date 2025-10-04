@@ -14,7 +14,7 @@ function App() {
   const [inputMessage, setInputMessage] = useState('');
   const [sessionId, setSessionId] = useState<string | undefined>(getCachedSessionId());
   
-  const { messages, messagesEndRef, addMessage, startAssistantMessage, appendToMessage, loadHistory } = useMessages();
+  const { messages, messagesEndRef, addMessage, startAssistantMessage, appendToMessage, addToolCallToMessage, loadHistory } = useMessages();
   const { tools, toggleTool, enabledToolsCount } = useTools();
   const uvId = getOrCreateUserId();
 
@@ -56,6 +56,12 @@ function App() {
               setSessionId(sid);
               saveSessionId(sid);
             }
+          },
+          onToolCallStarted: (toolCall) => {
+            addToolCallToMessage(assistantId, toolCall, false);
+          },
+          onToolCallCompleted: (toolCall) => {
+            addToolCallToMessage(assistantId, toolCall, true);
           }
         }
       );

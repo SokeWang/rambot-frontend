@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Send, Settings, X, Check } from 'lucide-react';
-import { Message, Tool } from '../types';
+import { Send, Settings, X, Check, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Message, Tool, ContentBlock } from '../types';
 import { formatTime } from '../utils';
 
 interface ChatPageProps {
@@ -25,6 +27,131 @@ const ChatPage: React.FC<ChatPageProps> = ({
   enabledToolsCount
 }) => {
   const [showToolsModal, setShowToolsModal] = useState(false);
+  const [expandedBlocks, setExpandedBlocks] = useState<Record<string, boolean>>({});
+
+  const toggleBlock = (blockKey: string) => {
+    setExpandedBlocks(prev => ({
+      ...prev,
+      [blockKey]: !prev[blockKey]
+    }));
+  };
+
+  // 工具调用卡片组件
+  const ToolCallCard: React.FC<{ 
+    block: ContentBlock; 
+    blockKey: string; 
+    isStarted?: boolean;
+  }> = ({ block, blockKey, isStarted = false }) => {
+    if (!block.toolCall) return null;
+    
+    const isExpanded = expandedBlocks[blockKey] ?? false;
+    const { tool_name, result, duration } = block.toolCall;
+    
+    return (
+      <div className={`
+        relative overflow-hidden rounded-2xl
+        bg-white/40 backdrop-blur-xl
+        border border-white/60
+        shadow-lg shadow-gray-900/5
+        transition-all duration-300
+        hover:shadow-xl hover:shadow-gray-900/10
+        ${isStarted ? 'animate-pulse' : ''}
+      `}>
+        {/* 工具头部 */}
+        <button
+          onClick={() => toggleBlock(blockKey)}
+          className="w-full px-4 py-3 flex items-center justify-between group"
+        >
+          <div className="flex items-center space-x-3">
+            <div className={`
+              flex items-center justify-center w-8 h-8 rounded-xl
+              ${isStarted 
+                ? 'bg-gradient-to-br from-amber-400/20 to-orange-400/20' 
+                : 'bg-gradient-to-br from-blue-400/20 to-cyan-400/20'
+              }
+              backdrop-blur-sm
+              transition-transform duration-300
+              ${isStarted ? 'animate-spin' : 'group-hover:scale-110'}
+            `}>
+              <Wrench className={`w-4 h-4 ${isStarted ? 'text-amber-600' : 'text-blue-600'}`} />
+            </div>
+            <div className="flex flex-col items-start">
+              <span className={`
+                font-semibold text-sm
+                ${isStarted ? 'text-amber-900' : 'text-gray-900'}
+              `}>
+                {tool_name}
+              </span>
+              {duration && !isStarted && (
+                <span className="text-xs text-gray-500">
+                  {(duration * 1000).toFixed(0)}ms
+                </span>
+              )}
+              {isStarted && (
+                <span className="text-xs text-amber-600">运行中...</span>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {!isStarted && result && (
+              <span className="text-xs text-green-600 font-medium px-2 py-1 bg-green-50/60 rounded-lg">
+                已完成
+              </span>
+            )}
+            {isExpanded ? (
+              <ChevronUp className="w-4 h-4 text-gray-600 group-hover:text-gray-900 transition-colors" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-600 group-hover:text-gray-900 transition-colors" />
+            )}
+          </div>
+        </button>
+
+        {/* 可折叠内容 */}
+        <div className={`
+          overflow-hidden transition-all duration-300 ease-in-out
+          ${isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}
+        `}>
+          <div className="px-4 pb-3 space-y-3">
+            {/* 分割线 */}
+            <div className="h-px bg-gradient-to-r from-transparent via-gray-200/60 to-transparent" />
+
+            {/* 结果部分 */}
+            {result && !isStarted && (
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <div className="w-1 h-4 rounded-full bg-gradient-to-b from-green-400 to-emerald-400" />
+                  <span className="text-xs font-semibold text-gray-700">结果</span>
+                </div>
+                <div className="
+                  ml-3 p-3 rounded-xl text-xs leading-relaxed
+                  bg-white/60 backdrop-blur-sm
+                  text-gray-800
+                  border border-white/80
+                  shadow-inner
+                  max-h-[400px] overflow-y-auto
+                  scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent
+                  prose prose-sm prose-gray max-w-none
+                  prose-headings:text-gray-900 prose-headings:font-semibold
+                  prose-p:text-gray-800 prose-p:my-2
+                  prose-ul:my-2 prose-ol:my-2
+                  prose-li:text-gray-800 prose-li:my-1
+                  prose-strong:text-gray-900 prose-strong:font-semibold
+                  prose-code:text-blue-700 prose-code:bg-blue-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+                  prose-pre:bg-gray-800 prose-pre:text-gray-100
+                  prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                ">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {result}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -61,7 +188,101 @@ const ChatPage: React.FC<ChatPageProps> = ({
                       : 'bg-white/80 text-gray-900 rounded-bl-md backdrop-blur-sm border border-gray-200/50'
                   }`}
                 >
-                  <p className="text-sm leading-relaxed">{message.text}</p>
+                  {/* 如果有 blocks，按顺序显示；否则显示 text */}
+                  {message.blocks && message.blocks.length > 0 ? (
+                    <div className="space-y-3">
+                      {message.blocks.map((block, index) => {
+                        const blockKey = `${message.id}-${index}`;
+                        return (
+                          <div key={blockKey}>
+                            {block.type === 'text' && block.text && (
+                              <div className={`
+                                text-sm leading-relaxed
+                                prose prose-sm max-w-none
+                                ${message.sender === 'user' 
+                                  ? `prose-invert
+                                     prose-headings:text-white prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
+                                     prose-p:text-white prose-p:my-2
+                                     prose-ul:my-2 prose-ol:my-2 prose-ul:list-disc prose-ol:list-decimal
+                                     prose-li:text-white prose-li:my-1
+                                     prose-strong:text-white prose-strong:font-bold
+                                     prose-em:text-gray-200 prose-em:italic
+                                     prose-code:text-blue-300 prose-code:bg-blue-900/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
+                                     prose-pre:bg-gray-950 prose-pre:text-gray-100 prose-pre:rounded-xl prose-pre:p-4
+                                     prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+                                     prose-blockquote:border-l-gray-500 prose-blockquote:text-gray-300 prose-blockquote:italic
+                                     prose-hr:border-gray-600`
+                                  : `prose-gray
+                                     prose-headings:text-gray-900 prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
+                                     prose-p:text-gray-900 prose-p:my-2
+                                     prose-ul:my-2 prose-ol:my-2 prose-ul:list-disc prose-ol:list-decimal
+                                     prose-li:text-gray-900 prose-li:my-1
+                                     prose-strong:text-gray-900 prose-strong:font-bold
+                                     prose-em:text-gray-900 prose-em:italic
+                                     prose-code:text-blue-700 prose-code:bg-blue-50/80 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
+                                     prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-pre:rounded-xl prose-pre:p-4
+                                     prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                                     prose-blockquote:border-l-gray-300 prose-blockquote:text-gray-700 prose-blockquote:italic
+                                     prose-hr:border-gray-200`
+                                }
+                              `}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {block.text}
+                                </ReactMarkdown>
+                              </div>
+                            )}
+                            
+                            {block.type === 'tool_call_started' && (
+                              <ToolCallCard 
+                                block={block} 
+                                blockKey={blockKey}
+                                isStarted={true}
+                              />
+                            )}
+                            
+                            {block.type === 'tool_call_completed' && (
+                              <ToolCallCard 
+                                block={block} 
+                                blockKey={blockKey}
+                                isStarted={false}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    // 向后兼容：如果没有 blocks，显示 text
+                    <div className={`
+                      text-sm leading-relaxed
+                      prose prose-sm max-w-none
+                      ${message.sender === 'user'
+                        ? `prose-invert
+                           prose-headings:text-white prose-headings:font-semibold
+                           prose-p:text-white prose-p:my-2
+                           prose-ul:my-2 prose-ol:my-2
+                           prose-li:text-white prose-li:my-1
+                           prose-strong:text-white prose-strong:font-bold
+                           prose-code:text-blue-300 prose-code:bg-blue-900/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                           prose-pre:bg-gray-950 prose-pre:text-gray-100
+                           prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline`
+                        : `prose-gray
+                           prose-headings:text-gray-900 prose-headings:font-semibold
+                           prose-p:text-gray-900 prose-p:my-2
+                           prose-ul:my-2 prose-ol:my-2
+                           prose-li:text-gray-900 prose-li:my-1
+                           prose-strong:text-gray-900 prose-strong:font-bold
+                           prose-code:text-blue-700 prose-code:bg-blue-50/80 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                           prose-pre:bg-gray-800 prose-pre:text-gray-100
+                           prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline`
+                      }
+                    `}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.text}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                  
                   <p
                     className={`text-xs mt-2 ${
                       message.sender === 'user' ? 'text-gray-300' : 'text-gray-500'

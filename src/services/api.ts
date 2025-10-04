@@ -2,7 +2,7 @@
  * API 服务层 - 处理所有与后端 API 的交互
  */
 
-import { ChatHistoryItem, ChatHistoryResponse } from '../types';
+import { ChatHistoryItem, ChatHistoryResponse, ToolCall, ToolCallEventData } from '../types';
 
 const API_BASE_URL = 'https://ai-mindflicker.com/api/v1';
 
@@ -46,7 +46,12 @@ export const streamAgentRun = async (
   message: string,
   userId: string,
   onLine: (line: string) => void,
-  options?: { sessionId?: string; onRunCompleted?: (sessionId?: string) => void }
+  options?: { 
+    sessionId?: string; 
+    onRunCompleted?: (sessionId?: string) => void;
+    onToolCallStarted?: (toolCall: ToolCall) => void;
+    onToolCallCompleted?: (toolCall: ToolCall) => void;
+  }
 ): Promise<void> => {
   const url = `${API_BASE_URL}/agents/rambot/runs`;
 
@@ -75,6 +80,9 @@ export const streamAgentRun = async (
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
   let currentEvent: string | null = null;
+  
+  // 用于临时存储工具调用信息
+  const toolCallsMap = new Map<string, ToolCall>();
 
   while (true) {
     const { value, done } = await reader.read();
@@ -97,7 +105,7 @@ export const streamAgentRun = async (
       if (line.startsWith('data:')) {
         const payload = line.slice(5).trim();
         
-        // 仅在 RunContent 提取 content（避免 RunCompleted 重复展示）
+        // 处理 RunContent 事件
         if (currentEvent === 'RunContent') {
           try {
             const obj = JSON.parse(payload);
@@ -106,7 +114,48 @@ export const streamAgentRun = async (
           } catch {
             // data 不是 JSON，忽略
           }
-        } else if (currentEvent === 'RunCompleted') {
+        } 
+        // 处理 ToolCallStarted 事件
+        else if (currentEvent === 'ToolCallStarted') {
+          try {
+            const obj = JSON.parse(payload);
+            const toolData = obj?.tool as ToolCallEventData;
+            if (toolData && toolData.tool_call_id) {
+              const toolCall: ToolCall = {
+                tool_call_id: toolData.tool_call_id,
+                tool_name: toolData.tool_name,
+                tool_args: toolData.tool_args
+              };
+              toolCallsMap.set(toolData.tool_call_id, toolCall);
+              if (options?.onToolCallStarted) {
+                options.onToolCallStarted(toolCall);
+              }
+            }
+          } catch {
+            // 忽略解析错误
+          }
+        }
+        // 处理 ToolCallCompleted 事件
+        else if (currentEvent === 'ToolCallCompleted') {
+          try {
+            const obj = JSON.parse(payload);
+            const toolData = obj?.tool as ToolCallEventData;
+            if (toolData && toolData.tool_call_id) {
+              const existingCall = toolCallsMap.get(toolData.tool_call_id);
+              if (existingCall) {
+                existingCall.result = toolData.result;
+                existingCall.duration = toolData.metrics?.duration;
+                if (options?.onToolCallCompleted) {
+                  options.onToolCallCompleted(existingCall);
+                }
+              }
+            }
+          } catch {
+            // 忽略解析错误
+          }
+        }
+        // 处理 RunCompleted 事件
+        else if (currentEvent === 'RunCompleted') {
           // 记录 session_id（如果首条请求未带 session_id，后端会在 RunCompleted 中返回）
           try {
             const obj = JSON.parse(payload);
@@ -139,6 +188,37 @@ export const streamAgentRun = async (
           const obj = JSON.parse(payload);
           const content = typeof obj?.content === 'string' ? obj.content : '';
           if (content) onLine(content);
+        } catch {
+          // 忽略
+        }
+      } else if (currentEvent === 'ToolCallStarted') {
+        try {
+          const obj = JSON.parse(payload);
+          const toolData = obj?.tool as ToolCallEventData;
+          if (toolData && toolData.tool_call_id && options?.onToolCallStarted) {
+            const toolCall: ToolCall = {
+              tool_call_id: toolData.tool_call_id,
+              tool_name: toolData.tool_name,
+              tool_args: toolData.tool_args
+            };
+            toolCallsMap.set(toolData.tool_call_id, toolCall);
+            options.onToolCallStarted(toolCall);
+          }
+        } catch {
+          // 忽略
+        }
+      } else if (currentEvent === 'ToolCallCompleted') {
+        try {
+          const obj = JSON.parse(payload);
+          const toolData = obj?.tool as ToolCallEventData;
+          if (toolData && toolData.tool_call_id && options?.onToolCallCompleted) {
+            const existingCall = toolCallsMap.get(toolData.tool_call_id);
+            if (existingCall) {
+              existingCall.result = toolData.result;
+              existingCall.duration = toolData.metrics?.duration;
+              options.onToolCallCompleted(existingCall);
+            }
+          }
         } catch {
           // 忽略
         }
